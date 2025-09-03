@@ -53,6 +53,26 @@ All colors MUST be HSL.
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+    
+    /* Audio Player Design System */
+    --audio-primary: 264 83% 57%;
+    --primary-glow: 264 83% 70%;
+    --audio-progress-bg: 220 13% 91%;
+    --audio-container-active: 264 83% 97%;
+    --audio-button-hover: 264 83% 90%;
+    --audio-time: 215.4 16.3% 46.9%;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--audio-primary)), hsl(var(--primary-glow)));
+    --gradient-container: linear-gradient(145deg, hsl(var(--card)), hsl(var(--muted) / 0.3));
+    --gradient-button: linear-gradient(145deg, hsl(var(--secondary)), hsl(var(--accent)));
+    
+    /* Shadows */
+    --shadow-container: 0 4px 12px hsl(var(--foreground) / 0.1);
+    --shadow-glow: 0 0 20px hsl(var(--audio-primary) / 0.3);
+    
+    /* Transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .dark {
@@ -91,6 +111,26 @@ All colors MUST be HSL.
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    
+    /* Audio Player Design System - Dark Mode */
+    --audio-primary: 264 83% 57%;
+    --primary-glow: 264 83% 70%;
+    --audio-progress-bg: 217.2 32.6% 17.5%;
+    --audio-container-active: 264 83% 15%;
+    --audio-button-hover: 264 83% 25%;
+    --audio-time: 215 20.2% 65.1%;
+    
+    /* Gradients - Dark Mode */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--audio-primary)), hsl(var(--primary-glow)));
+    --gradient-container: linear-gradient(145deg, hsl(var(--card)), hsl(var(--muted) / 0.3));
+    --gradient-button: linear-gradient(145deg, hsl(var(--secondary)), hsl(var(--accent)));
+    
+    /* Shadows - Dark Mode */
+    --shadow-container: 0 4px 12px hsl(0 0% 0% / 0.3);
+    --shadow-glow: 0 0 20px hsl(var(--audio-primary) / 0.4);
+    
+    /* Transitions */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 }
 

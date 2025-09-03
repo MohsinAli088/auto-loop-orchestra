@@ -34,9 +34,13 @@ export const AudioContainer: React.FC<AudioContainerProps> = ({
   // Handle active state changes
   useEffect(() => {
     if (!isActive && isPlaying) {
-      handlePause();
+      const audio = audioRef.current;
+      if (audio) {
+        audio.pause();
+        setIsPlaying(false);
+      }
     }
-  }, [isActive]);
+  }, [isActive, isPlaying]);
 
   // Setup audio event listeners
   useEffect(() => {
@@ -79,11 +83,18 @@ export const AudioContainer: React.FC<AudioContainerProps> = ({
     if (!audio) return;
 
     try {
+      // First notify parent to stop other audios
       onPlay(index);
+      
+      // Small delay to ensure other audios are stopped
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      // Then start this audio
       await audio.play();
       setIsPlaying(true);
     } catch (error) {
       console.error('Error playing audio:', error);
+      setIsPlaying(false);
     }
   };
 
