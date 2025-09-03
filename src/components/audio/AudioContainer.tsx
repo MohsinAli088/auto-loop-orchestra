@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Play, Pause, Volume2, RotateCcw } from 'lucide-react';
+import { Play, Pause, VolumeX, Volume1, Volume2, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 
 interface AudioContainerProps {
@@ -23,12 +24,26 @@ export const AudioContainer: React.FC<AudioContainerProps> = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [audioUrl, setAudioUrl] = useState<string>('');
+  const [volume, setVolume] = useState(1);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasError, setHasError] = useState(false);
 
   // Create audio URL from file
   useEffect(() => {
-    const url = URL.createObjectURL(file);
-    setAudioUrl(url);
-    return () => URL.revokeObjectURL(url);
+    try {
+      const url = URL.createObjectURL(file);
+      setAudioUrl(url);
+      setHasError(false);
+      setIsLoading(true);
+      return () => {
+        URL.revokeObjectURL(url);
+        setAudioUrl('');
+      };
+    } catch (error) {
+      console.error('Error creating audio URL:', error);
+      setHasError(true);
+      setIsLoading(false);
+    }
   }, [file]);
 
   // Handle active state changes
@@ -45,42 +60,70 @@ export const AudioContainer: React.FC<AudioContainerProps> = ({
   // Setup audio event listeners
   useEffect(() => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio || !audioUrl) return;
 
     const handleLoadedMetadata = () => {
-      setDuration(audio.duration);
+      setDuration(audio.duration || 0);
+      audio.volume = volume;
+      setIsLoading(false);
+      setHasError(false);
     };
 
     const handleTimeUpdate = () => {
-      setCurrentTime(audio.currentTime);
+      setCurrentTime(audio.currentTime || 0);
     };
 
     const handleEnded = () => {
-      // Auto-loop: restart immediately
-      audio.currentTime = 0;
-      audio.play().catch(console.error);
+      // Auto-loop: restart immediately if still active
+      if (isActive) {
+        audio.currentTime = 0;
+        audio.play().catch((error) => {
+          console.error('Error auto-looping audio:', error);
+          setIsPlaying(false);
+          setHasError(true);
+        });
+      }
     };
 
     const handleCanPlay = () => {
-      // Audio is ready to play
+      setIsLoading(false);
+      setHasError(false);
     };
 
+    const handleError = (e: Event) => {
+      console.error('Audio error:', e);
+      setHasError(true);
+      setIsLoading(false);
+      setIsPlaying(false);
+    };
+
+    const handleLoadStart = () => {
+      setIsLoading(true);
+      setHasError(false);
+    };
+
+    // Add all event listeners
     audio.addEventListener('loadedmetadata', handleLoadedMetadata);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('canplay', handleCanPlay);
+    audio.addEventListener('error', handleError);
+    audio.addEventListener('loadstart', handleLoadStart);
 
     return () => {
+      // Clean up all event listeners
       audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('canplay', handleCanPlay);
+      audio.removeEventListener('error', handleError);
+      audio.removeEventListener('loadstart', handleLoadStart);
     };
-  }, [audioUrl]);
+  }, [audioUrl, volume, isActive]);
 
   const handlePlay = async () => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio || hasError || isLoading) return;
 
     try {
       // First notify parent to stop other audios
@@ -89,12 +132,24 @@ export const AudioContainer: React.FC<AudioContainerProps> = ({
       // Small delay to ensure other audios are stopped
       await new Promise(resolve => setTimeout(resolve, 50));
       
+      // Ensure volume is set correctly
+      audio.volume = volume;
+      
       // Then start this audio
       await audio.play();
       setIsPlaying(true);
+      setHasError(false);
     } catch (error) {
       console.error('Error playing audio:', error);
       setIsPlaying(false);
+      setHasError(true);
+      
+      // Try to reset audio element
+      try {
+        audio.load();
+      } catch (loadError) {
+        console.error('Error reloading audio:', loadError);
+      }
     }
   };
 
@@ -102,31 +157,66 @@ export const AudioContainer: React.FC<AudioContainerProps> = ({
     const audio = audioRef.current;
     if (!audio) return;
 
-    audio.pause();
-    setIsPlaying(false);
-    onStop();
+    try {
+      audio.pause();
+      setIsPlaying(false);
+      onStop();
+    } catch (error) {
+      console.error('Error pausing audio:', error);
+      setIsPlaying(false);
+    }
   };
 
   const handleRestart = () => {
     const audio = audioRef.current;
-    if (!audio) return;
+    if (!audio || hasError) return;
 
-    audio.currentTime = 0;
-    if (isPlaying) {
-      audio.play().catch(console.error);
+    try {
+      audio.currentTime = 0;
+      if (isPlaying) {
+        audio.play().catch((error) => {
+          console.error('Error restarting audio:', error);
+          setHasError(true);
+          setIsPlaying(false);
+        });
+      }
+    } catch (error) {
+      console.error('Error restarting audio:', error);
+      setHasError(true);
     }
+  };
+
+  const handleVolumeChange = (value: number[]) => {
+    const newVolume = value[0];
+    setVolume(newVolume);
+    
+    const audio = audioRef.current;
+    if (audio) {
+      audio.volume = newVolume;
+    }
+  };
+
+  const getVolumeIcon = () => {
+    if (volume === 0) return VolumeX;
+    if (volume < 0.5) return Volume1;
+    return Volume2;
   };
 
   const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
     const audio = audioRef.current;
-    if (!audio || !duration) return;
+    if (!audio || !duration || hasError) return;
 
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const newTime = (clickX / rect.width) * duration;
-    
-    audio.currentTime = newTime;
-    setCurrentTime(newTime);
+    try {
+      const rect = e.currentTarget.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const newTime = Math.max(0, Math.min((clickX / rect.width) * duration, duration));
+      
+      audio.currentTime = newTime;
+      setCurrentTime(newTime);
+    } catch (error) {
+      console.error('Error seeking audio:', error);
+      setHasError(true);
+    }
   };
 
   const formatTime = (time: number): string => {
@@ -137,12 +227,55 @@ export const AudioContainer: React.FC<AudioContainerProps> = ({
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   };
 
+  const VolumeIcon = getVolumeIcon();
   const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  // Error state
+  if (hasError) {
+    return (
+      <div className="audio-container rounded-xl p-6 space-y-4 border-2 border-destructive/20 bg-destructive/5">
+        <div className="flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-lg font-semibold text-foreground truncate">
+              {file.name}
+            </h3>
+            <p className="text-sm text-destructive">
+              Error loading audio file
+            </p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="text-sm font-mono text-destructive">
+              #{index + 1}
+            </span>
+          </div>
+        </div>
+        
+        <div className="text-center py-4">
+          <p className="text-sm text-muted-foreground mb-2">Unable to load this audio file</p>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => {
+              setHasError(false);
+              setIsLoading(true);
+              const audio = audioRef.current;
+              if (audio) {
+                audio.load();
+              }
+            }}
+          >
+            Try Again
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={cn(
-      "audio-container rounded-xl p-6 space-y-4",
-      isActive && isPlaying && "playing"
+      "audio-container rounded-xl p-6 space-y-4 transition-all duration-300",
+      isActive && isPlaying && "playing",
+      isLoading && "opacity-75"
     )}>
       <audio
         ref={audioRef}
@@ -159,10 +292,11 @@ export const AudioContainer: React.FC<AudioContainerProps> = ({
           </h3>
           <p className="text-sm text-audio-time">
             {(file.size / 1024 / 1024).toFixed(2)} MB
+            {isLoading && " • Loading..."}
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <Volume2 className="w-4 h-4 text-audio-time" />
+          <VolumeIcon className="w-4 h-4 text-audio-time" />
           <span className="text-sm font-mono text-audio-time">
             #{index + 1}
           </span>
@@ -171,11 +305,11 @@ export const AudioContainer: React.FC<AudioContainerProps> = ({
 
       {/* Progress Bar */}
       <div 
-        className="audio-progress-track h-2 rounded-full cursor-pointer"
+        className="audio-progress-track h-2 rounded-full cursor-pointer transition-opacity duration-200 hover:opacity-80"
         onClick={handleProgressClick}
       >
         <div 
-          className="audio-progress-fill h-full rounded-full"
+          className="audio-progress-fill h-full rounded-full transition-all duration-200"
           style={{ width: `${progressPercentage}%` }}
         />
       </div>
@@ -186,43 +320,52 @@ export const AudioContainer: React.FC<AudioContainerProps> = ({
         <span>{formatTime(duration)}</span>
       </div>
 
-      {/* Controls */}
-      <div className="flex items-center justify-center space-x-3">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="audio-button h-10 w-10"
-          onClick={handleRestart}
-        >
-          <RotateCcw className="w-4 h-4" />
-        </Button>
+      {/* Controls - Rearranged with play and restart on left */}
+      <div className="flex items-center justify-between space-x-4">
+        {/* Left side: Play and Restart */}
+        <div className="flex items-center space-x-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="audio-button h-10 w-10"
+            onClick={handleRestart}
+            disabled={isLoading || hasError}
+          >
+            <RotateCcw className="w-4 h-4" />
+          </Button>
 
-        <Button
-          variant={isPlaying ? "secondary" : "default"}
-          size="lg"
-          className="h-12 w-12 rounded-full"
-          onClick={isPlaying ? handlePause : handlePlay}
-        >
-          {isPlaying ? (
-            <Pause className="w-5 h-5" />
-          ) : (
-            <Play className="w-5 h-5 ml-0.5" />
-          )}
-        </Button>
+          <Button
+            variant={isPlaying ? "secondary" : "default"}
+            size="lg"
+            className="h-12 w-12 rounded-full"
+            onClick={isPlaying ? handlePause : handlePlay}
+            disabled={isLoading || hasError}
+          >
+            {isPlaying ? (
+              <Pause className="w-5 h-5" />
+            ) : (
+              <Play className="w-5 h-5 ml-0.5" />
+            )}
+          </Button>
+        </div>
 
-        <Button
-          variant="ghost"
-          size="sm"
-          className="audio-button h-10 w-10"
-          onClick={() => {
-            const audio = audioRef.current;
-            if (audio) {
-              audio.volume = audio.volume === 0 ? 1 : 0;
-            }
-          }}
-        >
-          <Volume2 className="w-4 h-4" />
-        </Button>
+        {/* Right side: Volume Controls */}
+          <div className="flex items-center space-x-3 flex-1 max-w-32">
+            <VolumeIcon className="w-4 h-4 text-audio-time flex-shrink-0" />
+            <div className="flex-1 volume-slider">
+              <Slider
+                value={[volume]}
+                onValueChange={handleVolumeChange}
+                max={1}
+                min={0}
+                step={0.01}
+                className="flex-1"
+              />
+            </div>
+            <span className="text-xs text-audio-time w-8 text-right">
+              {Math.round(volume * 100)}%
+            </span>
+          </div>
       </div>
 
       {/* Status Indicator */}
@@ -230,6 +373,14 @@ export const AudioContainer: React.FC<AudioContainerProps> = ({
         <div className="flex items-center justify-center space-x-2 text-primary">
           <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
           <span className="text-sm font-medium">Playing</span>
+        </div>
+      )}
+
+      {/* Loading Indicator */}
+      {isLoading && (
+        <div className="flex items-center justify-center space-x-2 text-muted-foreground">
+          <div className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" />
+          <span className="text-sm">Loading audio...</span>
         </div>
       )}
     </div>

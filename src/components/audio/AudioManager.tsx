@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { AudioContainer } from './AudioContainer';
 import { FileSelector } from './FileSelector';
 import { Button } from '@/components/ui/button';
@@ -7,6 +7,23 @@ import { RotateCcw, Trash2, Info } from 'lucide-react';
 export const AudioManager: React.FC = () => {
   const [audioFiles, setAudioFiles] = useState<File[]>([]);
   const [activeAudioIndex, setActiveAudioIndex] = useState<number | null>(null);
+
+  // Add beforeunload protection
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (audioFiles.length > 0) {
+        e.preventDefault();
+        e.returnValue = 'You have audio files loaded. Are you sure you want to leave?';
+        return 'You have audio files loaded. Are you sure you want to leave?';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [audioFiles.length]);
 
   const handleFilesSelected = useCallback((files: File[]) => {
     setAudioFiles(files);
