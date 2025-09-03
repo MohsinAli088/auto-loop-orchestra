@@ -100,6 +100,64 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-medium;
+  }
+  
+  /* Audio Player Specific Styles */
+  .audio-container {
+    background: var(--gradient-container);
+    border: 1px solid hsl(var(--border));
+    box-shadow: var(--shadow-container);
+    transition: var(--transition-smooth);
+  }
+  
+  .audio-container.playing {
+    background: hsl(var(--audio-container-active));
+    box-shadow: var(--shadow-glow);
+    border-color: hsl(var(--primary));
+  }
+  
+  .audio-button {
+    background: var(--gradient-button);
+    transition: var(--transition-smooth);
+  }
+  
+  .audio-button:hover {
+    background: hsl(var(--audio-button-hover));
+    transform: translateY(-1px);
+  }
+  
+  .audio-progress-track {
+    background: hsl(var(--audio-progress-bg));
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .audio-progress-fill {
+    background: var(--gradient-primary);
+    transition: width 0.1s ease;
+    position: relative;
+  }
+  
+  .audio-progress-fill::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 4px;
+    height: 100%;
+    background: hsl(var(--primary-glow));
+    box-shadow: 0 0 8px hsl(var(--primary-glow));
+  }
+  
+  .file-drop-zone {
+    border: 2px dashed hsl(var(--border));
+    transition: var(--transition-smooth);
+  }
+  
+  .file-drop-zone.drag-active {
+    border-color: hsl(var(--primary));
+    background: hsl(var(--primary) / 0.05);
+    box-shadow: var(--shadow-glow);
   }
 }
